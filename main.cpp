@@ -1,12 +1,11 @@
 #include "Arduino.h"
 
-#define BUTTONCOUNT 4
-#define MAX_SEQ_LEN 5
-#define TIMEOUT 4000
-#define DEBOUNCE 40
-
-#define STATUS_LED 13
-#define BUZZER 10
+constexpr int BUTTONCOUNT = 4;
+constexpr int MAX_SEQ_LEN = 5;
+constexpr int TIMEOUT = 4000;
+constexpr int DEBOUNCE = 40;
+constexpr int STATUS_LED = 13;
+constexpr int BUZZER = 10;
 
 constexpr int ledPins[] = { 2, 3, 4, 5 };
 constexpr int buttonPins[] = { 6, 7, 8, 9 };
