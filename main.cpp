@@ -23,7 +23,7 @@ public:
     pinMode(BUZZER, INPUT);
     for (int i = 0; i < BUTTONCOUNT; i++) {
       pinMode(ledPins[i], OUTPUT);
-      pinMode(buttonPins[i], INPUT);
+      pinMode(buttonPins[i], INPUT_PULLUP);
       buttonState[i] = 0;
       volatileState[i] = 0;
       debounceTime[i] = 0;
@@ -74,7 +74,7 @@ public:
     int toggledButton = -1;
     bool value;
     for (int i = 0; i < BUTTONCOUNT; i++) {
-      value = digitalRead(buttonPins[i]) == HIGH;
+      value = digitalRead(buttonPins[i]) == LOW;
       if (value != volatileState[i]) {
         volatileState[i] = value;
         debounceTime[i] = millis();
