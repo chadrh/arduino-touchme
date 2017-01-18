@@ -107,6 +107,7 @@ class State
   }
   void youLose()
   {
+    // FIXME: this should be a different tone.
     io.Buzzer(3);
     delay(1000);
     io.Buzzer(3, false);
@@ -146,6 +147,7 @@ public:
   }
   void Process()
   {
+    // FIXME: PollButtons could theoretically fail to report a simulataneous button press
     int buttonNum = io.PollButtons();
     if (buttonNum < 0) {
       // nothing pressed: do we need to timeout?
@@ -155,24 +157,29 @@ public:
     } else {
       // a button was pressed or released
       bool value = io.ButtonState(buttonNum);
-      //io.SetLED(buttonNum, value);
-      //io.Buzzer(buttonNum, value);
       if (value) {
         // button pressed down, read the input.
+        // FIXME: if a button is pressed while one is still held down, that
+        //        should lose the game.
         int correctButton = sequence[inputPosition++];
         if (buttonNum != correctButton)
           youLose();
         else {
           // display confirmation
-          io.Blink(buttonNum, 500, false);
-
-          if (inputPosition == sequenceLen) {
-            // passed the test! make the sequence longer
-            delay(1000);
-            addToSequence();
-          } else {
-            lastInputTime = millis();
-          }
+          io.SetLED(buttonNum);
+          io.Buzzer(buttonNum);
+          lastInputTime = millis();
+        }
+      } else {
+        // button released, move on.
+        io.SetLED(buttonNum, false);
+        io.Buzzer(buttonNum, false);
+        if (inputPosition == sequenceLen) {
+          // passed the test! make the sequence longer
+          delay(1000);
+          addToSequence();
+        } else {
+          lastInputTime = millis();
         }
       }
     }
