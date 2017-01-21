@@ -6,6 +6,7 @@ AVR_TOOLS_DIR = /usr
 BOARD_TAG    = uno
 MONITOR_PORT = /dev/ttyACM*
 
+ARDUINO_QUIET = 1
 CPPFLAGS = -std=gnu++11
 
 include /usr/share/arduino/Arduino.mk

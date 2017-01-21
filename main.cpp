@@ -9,7 +9,7 @@ constexpr int BUZZER = 10;
 
 constexpr int ledPins[] = { 2, 3, 4, 5 };
 constexpr int buttonPins[] = { 6, 7, 8, 9 };
-constexpr int frequencies[] = { 121, 1000, 2376, 10000 };
+constexpr int frequencies[] = { 121, 1000, 2376, 4000, 5000 };
 
 class IO
 {
@@ -107,8 +107,7 @@ class State
   }
   void youLose()
   {
-    // FIXME: this should be a different tone.
-    io.Buzzer(3);
+    io.Buzzer(4);
     delay(1000);
     io.Buzzer(3, false);
     restart();
