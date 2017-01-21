@@ -68,6 +68,18 @@ public:
   void Demo()
   {
     // TODO: blink & buzz every light
+    for (int i = 0; i < BUTTONCOUNT; i++) {
+      Blink(i, 500, false);
+    }
+    delay(500);
+    for (int i = 0; i < BUTTONCOUNT; i++) {
+      Blink(i, 200, true);
+    }
+    delay(500);
+    Buzzer(BUTTONCOUNT);
+    delay(200);
+    Buzzer(BUTTONCOUNT, false);
+    delay(500);
   }
   int PollButtons()
   {
@@ -107,9 +119,9 @@ class State
   }
   void youLose()
   {
-    io.Buzzer(4);
-    delay(1000);
-    io.Buzzer(3, false);
+    io.Buzzer(BUTTONCOUNT);
+    delay(800);
+    io.Buzzer(BUTTONCOUNT, false);
     restart();
   }
   void restart()
@@ -187,6 +199,7 @@ public:
 
 void setup() {
   io.Setup();
+  io.Demo();
   state.NewGame();
 }
 
