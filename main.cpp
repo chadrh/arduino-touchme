@@ -8,6 +8,8 @@ constexpr int BLINK_TIME = 200; // when displaying sequence
 constexpr int NEXT_LEVEL_DELAY = 800; // when adding to the sequence
 constexpr int STATUS_LED = 13;
 constexpr int BUZZER = 10;
+constexpr int MY_TURN = A3;
+constexpr int YOUR_TURN = A4;
 
 constexpr int ledPins[] = { 2, 3, 4, 5 };
 constexpr int buttonPins[] = { 6, 7, 8, 9 };
@@ -22,6 +24,8 @@ public:
   void Setup()
   {
     pinMode(STATUS_LED, OUTPUT);
+    pinMode(MY_TURN, OUTPUT);
+    pinMode(YOUR_TURN, OUTPUT);
     pinMode(BUZZER, INPUT);
     for (int i = 0; i < BUTTONCOUNT; i++) {
       pinMode(ledPins[i], OUTPUT);
@@ -41,9 +45,13 @@ public:
   {
     return buttonState[num];
   }
+  void WritePin(int pinNum, bool value) const
+  {
+    digitalWrite(pinNum, value ? HIGH : LOW);
+  }
   void SetLED(int num, bool on = true) const
   {
-    digitalWrite(ledPins[num], on ? HIGH : LOW);
+    WritePin(ledPins[num], on);
   }
   void Buzzer(int num, bool on = true) const
   {
@@ -133,6 +141,7 @@ class State
   }
   void addToSequence()
   {
+    myTurn();
     if (sequenceLen == MAX_SEQ_LEN) {
       youWin();
       return;
@@ -142,6 +151,12 @@ class State
     DisplaySequence();
     inputPosition = 0;
     lastInputTime = millis();
+    myTurn(false);
+  }
+  void myTurn(bool isMyTurn = true)
+  {
+    io.WritePin(MY_TURN, isMyTurn);
+    io.WritePin(YOUR_TURN, !isMyTurn);
   }
 public:
   void NewGame()
