@@ -4,6 +4,8 @@ constexpr int BUTTONCOUNT = 4;
 constexpr int MAX_SEQ_LEN = 5;
 constexpr int TIMEOUT = 4000;
 constexpr int DEBOUNCE = 40;
+constexpr int BLINK_TIME = 200; // when displaying sequence
+constexpr int NEXT_LEVEL_DELAY = 800; // when adding to the sequence
 constexpr int STATUS_LED = 13;
 constexpr int BUZZER = 10;
 
@@ -151,9 +153,9 @@ public:
   {
     for (byte i = 0; i < sequenceLen; i++) {
       int num = sequence[i];
-      io.Blink(num, 500);
+      io.Blink(num, BLINK_TIME);
       if (i < sequenceLen - 1)
-        delay(500);
+        delay(BLINK_TIME);
     }
   }
   void Process()
@@ -187,7 +189,7 @@ public:
         io.Buzzer(buttonNum, false);
         if (inputPosition == sequenceLen) {
           // passed the test! make the sequence longer
-          delay(1000);
+          delay(NEXT_LEVEL_DELAY);
           addToSequence();
         } else {
           lastInputTime = millis();
