@@ -1,7 +1,7 @@
 #include "Arduino.h"
 
 constexpr int BUTTONCOUNT = 4;
-constexpr int MAX_SEQ_LEN = 5;
+constexpr int MAX_SEQ_LEN = 10;
 constexpr int TIMEOUT = 4000;
 constexpr int DEBOUNCE = 40;
 constexpr int BLINK_TIME = 200; // when displaying sequence
@@ -10,22 +10,30 @@ constexpr int STATUS_LED = 13;
 constexpr int BUZZER = 10;
 constexpr int MY_TURN = A3;
 constexpr int YOUR_TURN = A4;
+constexpr int DATA_PIN = A2;
+constexpr int LATCH_PIN = A1;
+constexpr int CLOCK_PIN = A0;
 
 constexpr int ledPins[] = { 2, 3, 4, 5 };
 constexpr int buttonPins[] = { 6, 7, 8, 9 };
 constexpr int frequencies[] = { 121, 1000, 2376, 4000, 5000 };
+constexpr byte digitValues[16] = { 252, 96, 218, 242, 102, 182, 190, 224, 254, 246, 238, 62, 156, 122, 158, 142 };
 
 class IO
 {
   bool buttonState[BUTTONCOUNT];
   bool volatileState[BUTTONCOUNT];
   unsigned long debounceTime[BUTTONCOUNT];
+
 public:
   void Setup()
   {
     pinMode(STATUS_LED, OUTPUT);
     pinMode(MY_TURN, OUTPUT);
     pinMode(YOUR_TURN, OUTPUT);
+    pinMode(LATCH_PIN, OUTPUT);
+    pinMode(CLOCK_PIN, OUTPUT);
+    pinMode(DATA_PIN, OUTPUT);
     pinMode(BUZZER, INPUT);
     for (int i = 0; i < BUTTONCOUNT; i++) {
       pinMode(ledPins[i], OUTPUT);
@@ -35,15 +43,26 @@ public:
       debounceTime[i] = 0;
     }
     SeedRandom();
+    WriteByte(0);
   }
   void SeedRandom()
   {
     // TODO: reads are 10 bits of resolution, so gather at least 3.
-    randomSeed(analogRead(A0));
+    randomSeed(analogRead(A5));
   }
   bool ButtonState(int num) const
   {
     return buttonState[num];
+  }
+  void WriteByte(byte val) const
+  {
+    digitalWrite(LATCH_PIN, LOW);
+    shiftOut(DATA_PIN, CLOCK_PIN, MSBFIRST, val);
+    digitalWrite(LATCH_PIN, HIGH);
+  }
+  void WriteDigit(int val) const
+  {
+    WriteByte(digitValues[val]);
   }
   void WritePin(int pinNum, bool value) const
   {
@@ -77,7 +96,11 @@ public:
   }
   void Demo()
   {
-    // TODO: blink & buzz every light
+    for (int i = 0; i < 16; i++) {
+      WriteDigit(i);
+      delay(500);
+    }
+
     for (int i = 0; i < BUTTONCOUNT; i++) {
       Blink(i, 500, false);
     }
@@ -89,6 +112,7 @@ public:
     Buzzer(BUTTONCOUNT);
     delay(200);
     Buzzer(BUTTONCOUNT, false);
+    WriteByte(0);
     delay(500);
   }
   int PollButtons()
@@ -161,6 +185,7 @@ class State
 public:
   void NewGame()
   {
+    io.WriteDigit(0);
     sequenceLen = 0;
     addToSequence();
   }
@@ -204,6 +229,7 @@ public:
         io.Buzzer(buttonNum, false);
         if (inputPosition == sequenceLen) {
           // passed the test! make the sequence longer
+          io.WriteDigit(sequenceLen);
           delay(NEXT_LEVEL_DELAY);
           addToSequence();
         } else {
