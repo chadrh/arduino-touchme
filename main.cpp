@@ -13,10 +13,11 @@ constexpr int YOUR_TURN = A4;
 constexpr int DATA_PIN = A2;
 constexpr int LATCH_PIN = A1;
 constexpr int CLOCK_PIN = A0;
+constexpr int START_BUTTON = 11;
 
-constexpr int ledPins[] = { 2, 3, 4, 5 };
-constexpr int buttonPins[] = { 6, 7, 8, 9 };
-constexpr int frequencies[] = { 121, 1000, 2376, 4000, 5000 };
+constexpr int ledPins[BUTTONCOUNT] = { 2, 3, 4, 5 };
+constexpr int buttonPins[BUTTONCOUNT] = { 6, 7, 8, 9 };
+constexpr const int frequencies[5] = { 121, 1000, 2376, 4000, 5000 };
 constexpr byte digitValues[16] = { 252, 96, 218, 242, 102, 182, 190, 224, 254, 246, 238, 62, 156, 122, 158, 142 };
 
 class IO
@@ -35,6 +36,7 @@ public:
     pinMode(CLOCK_PIN, OUTPUT);
     pinMode(DATA_PIN, OUTPUT);
     pinMode(BUZZER, INPUT);
+    pinMode(START_BUTTON, INPUT_PULLUP);
     for (int i = 0; i < BUTTONCOUNT; i++) {
       pinMode(ledPins[i], OUTPUT);
       pinMode(buttonPins[i], INPUT_PULLUP);
@@ -82,6 +84,11 @@ public:
       pinMode(BUZZER, INPUT);
     }
   }
+  void MyTurn(bool isMyTurn = true)
+  {
+    WritePin(MY_TURN, isMyTurn);
+    WritePin(YOUR_TURN, !isMyTurn);
+  }
   void Blink(int num, int time, bool buzz = true) const
   {
     SetLED(num);
@@ -96,24 +103,19 @@ public:
   }
   void Demo()
   {
-    for (int i = 0; i < 16; i++) {
-      WriteDigit(i);
-      delay(500);
-    }
-
-    for (int i = 0; i < BUTTONCOUNT; i++) {
-      Blink(i, 500, false);
-    }
-    delay(500);
-    for (int i = 0; i < BUTTONCOUNT; i++) {
-      Blink(i, 200, true);
-    }
-    delay(500);
-    Buzzer(BUTTONCOUNT);
-    delay(200);
-    Buzzer(BUTTONCOUNT, false);
-    WriteByte(0);
-    delay(500);
+    unsigned int c = 0;
+    int light = -1;
+    do {
+      int prev = light;
+      do {
+        light = random(BUTTONCOUNT);
+      } while (light == prev);
+      WriteDigit((c++) % 10);
+      MyTurn(c % 2);
+      SetLED(light);
+      delay(1000);
+      SetLED(light, false);
+    } while (digitalRead(START_BUTTON) != LOW);
   }
   int PollButtons()
   {
@@ -165,7 +167,7 @@ class State
   }
   void addToSequence()
   {
-    myTurn();
+    io.MyTurn();
     if (sequenceLen == MAX_SEQ_LEN) {
       youWin();
       return;
@@ -175,16 +177,12 @@ class State
     DisplaySequence();
     inputPosition = 0;
     lastInputTime = millis();
-    myTurn(false);
-  }
-  void myTurn(bool isMyTurn = true)
-  {
-    io.WritePin(MY_TURN, isMyTurn);
-    io.WritePin(YOUR_TURN, !isMyTurn);
+    io.MyTurn(false);
   }
 public:
   void NewGame()
   {
+    io.Demo();
     io.WriteDigit(0);
     sequenceLen = 0;
     addToSequence();
@@ -242,7 +240,6 @@ public:
 
 void setup() {
   io.Setup();
-  io.Demo();
   state.NewGame();
 }
 
