@@ -1,5 +1,7 @@
 #include "Arduino.h"
 
+#include "DigitDisplay.hpp"
+
 constexpr int BUTTONCOUNT = 4;
 constexpr int MAX_SEQ_LEN = 10;
 constexpr int TIMEOUT = 4000;
@@ -18,23 +20,21 @@ constexpr int START_BUTTON = 11;
 constexpr int ledPins[BUTTONCOUNT] = { 2, 3, 4, 5 };
 constexpr int buttonPins[BUTTONCOUNT] = { 6, 7, 8, 9 };
 constexpr const int frequencies[5] = { 121, 1000, 2376, 4000, 5000 };
-constexpr byte digitValues[16] = { 252, 96, 218, 242, 102, 182, 190, 224, 254, 246, 238, 62, 156, 122, 158, 142 };
 
 class IO
 {
   bool buttonState[BUTTONCOUNT];
   bool volatileState[BUTTONCOUNT];
   unsigned long debounceTime[BUTTONCOUNT];
+  DigitDisplay digit;
 
 public:
-  void Setup()
+  IO()
+    : digit(CLOCK_PIN, LATCH_PIN, DATA_PIN)
   {
     pinMode(STATUS_LED, OUTPUT);
     pinMode(MY_TURN, OUTPUT);
     pinMode(YOUR_TURN, OUTPUT);
-    pinMode(LATCH_PIN, OUTPUT);
-    pinMode(CLOCK_PIN, OUTPUT);
-    pinMode(DATA_PIN, OUTPUT);
     pinMode(BUZZER, INPUT);
     pinMode(START_BUTTON, INPUT_PULLUP);
     for (int i = 0; i < BUTTONCOUNT; i++) {
@@ -45,7 +45,7 @@ public:
       debounceTime[i] = 0;
     }
     SeedRandom();
-    WriteByte(0);
+    digit.Blank();
   }
   void SeedRandom()
   {
@@ -56,15 +56,9 @@ public:
   {
     return buttonState[num];
   }
-  void WriteByte(byte val) const
-  {
-    digitalWrite(LATCH_PIN, LOW);
-    shiftOut(DATA_PIN, CLOCK_PIN, MSBFIRST, val);
-    digitalWrite(LATCH_PIN, HIGH);
-  }
   void WriteDigit(int val) const
   {
-    WriteByte(digitValues[val]);
+    digit.WriteDigit(val);
   }
   void WritePin(int pinNum, bool value) const
   {
@@ -141,6 +135,7 @@ class State
   byte inputPosition = 0;
   int sequence[MAX_SEQ_LEN];
   unsigned long lastInputTime;
+
   void youWin()
   {
     for (int i = 0; i < 3; i++) {
@@ -239,7 +234,6 @@ public:
 } state;
 
 void setup() {
-  io.Setup();
   state.NewGame();
 }
 
