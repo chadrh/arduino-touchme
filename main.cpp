@@ -1,36 +1,42 @@
 #include "Arduino.h"
 
 #include "DigitDisplay.hpp"
+#include "ButtonGroup.hpp"
+
+// Timing constants
+constexpr int DEBOUNCE = 40;
+constexpr int TIMEOUT = 4000;
+constexpr int BLINK_TIME = 200; // when displaying sequence
+constexpr int NEXT_LEVEL_DELAY = 800; // when adding to the sequence
 
 constexpr int BUTTONCOUNT = 4;
 constexpr int MAX_SEQ_LEN = 10;
-constexpr int TIMEOUT = 4000;
-constexpr int DEBOUNCE = 40;
-constexpr int BLINK_TIME = 200; // when displaying sequence
-constexpr int NEXT_LEVEL_DELAY = 800; // when adding to the sequence
-constexpr int STATUS_LED = 13;
-constexpr int BUZZER = 10;
+
+// Pin assignments
+constexpr int CLOCK_PIN = A0;
+constexpr int LATCH_PIN = A1;
+constexpr int DATA_PIN = A2;
 constexpr int MY_TURN = A3;
 constexpr int YOUR_TURN = A4;
-constexpr int DATA_PIN = A2;
-constexpr int LATCH_PIN = A1;
-constexpr int CLOCK_PIN = A0;
-constexpr int START_BUTTON = 11;
-
+constexpr int UNUSED_ANALOG = A5;
+constexpr int START_BUTTON = 11; // Remove
 constexpr int ledPins[BUTTONCOUNT] = { 2, 3, 4, 5 };
-constexpr int buttonPins[BUTTONCOUNT] = { 6, 7, 8, 9 };
+constexpr int buttonPins[BUTTONCOUNT + 1] = { 6, 7, 8, 9, 11 };
+constexpr int STATUS_LED = 13;
+constexpr int BUZZER = 10;
+
 constexpr const int frequencies[5] = { 121, 1000, 2376, 4000, 5000 };
 
 class IO
 {
-  bool buttonState[BUTTONCOUNT];
-  bool volatileState[BUTTONCOUNT];
-  unsigned long debounceTime[BUTTONCOUNT];
   DigitDisplay digit;
 
 public:
+  ButtonGroup<BUTTONCOUNT + 1> buttons;
+
   IO()
     : digit(CLOCK_PIN, LATCH_PIN, DATA_PIN)
+    , buttons(DEBOUNCE, buttonPins)
   {
     pinMode(STATUS_LED, OUTPUT);
     pinMode(MY_TURN, OUTPUT);
@@ -39,10 +45,6 @@ public:
     pinMode(START_BUTTON, INPUT_PULLUP);
     for (int i = 0; i < BUTTONCOUNT; i++) {
       pinMode(ledPins[i], OUTPUT);
-      pinMode(buttonPins[i], INPUT_PULLUP);
-      buttonState[i] = 0;
-      volatileState[i] = 0;
-      debounceTime[i] = 0;
     }
     SeedRandom();
     digit.Blank();
@@ -51,10 +53,6 @@ public:
   {
     // TODO: reads are 10 bits of resolution, so gather at least 3.
     randomSeed(analogRead(A5));
-  }
-  bool ButtonState(int num) const
-  {
-    return buttonState[num];
   }
   void WriteDigit(int val) const
   {
@@ -68,15 +66,15 @@ public:
   {
     WritePin(ledPins[num], on);
   }
-  void Buzzer(int num, bool on = true) const
+  void Buzzer(int num) const
   {
-    if (on) {
-      pinMode(BUZZER, OUTPUT);
-      tone(BUZZER, frequencies[num]);
-    } else {
-      noTone(BUZZER);
-      pinMode(BUZZER, INPUT);
-    }
+    pinMode(BUZZER, OUTPUT);
+    tone(BUZZER, frequencies[num]);
+  }
+  void BuzzerOff() const
+  {
+    noTone(BUZZER);
+    pinMode(BUZZER, INPUT);
   }
   void MyTurn(bool isMyTurn = true)
   {
@@ -91,41 +89,39 @@ public:
     }
     delay(time);
     if (buzz) {
-      Buzzer(num, false);
+      BuzzerOff();
     }
     SetLED(num, false);
   }
   void Demo()
   {
-    unsigned int c = 0;
+    unsigned long lastTime = 0;
     int light = -1;
-    do {
-      int prev = light;
-      do {
-        light = random(BUTTONCOUNT);
-      } while (light == prev);
-      WriteDigit((c++) % 10);
-      MyTurn(c % 2);
-      SetLED(light);
-      delay(1000);
-      SetLED(light, false);
-    } while (digitalRead(START_BUTTON) != LOW);
-  }
-  int PollButtons()
-  {
-    int toggledButton = -1;
-    bool value;
-    for (int i = 0; i < BUTTONCOUNT; i++) {
-      value = digitalRead(buttonPins[i]) == LOW;
-      if (value != volatileState[i]) {
-        volatileState[i] = value;
-        debounceTime[i] = millis();
-      } else if (value != buttonState[i] && (millis() - debounceTime[i]) > DEBOUNCE) {
-        buttonState[i] = value;
-        toggledButton = i;
+    int c = 0;
+
+    while (!buttons.PollForRelease(BUTTONCOUNT)) {
+      unsigned long time = millis();
+      if (time - lastTime > 1000) {
+        int prev = light;
+        do {
+          light = random(BUTTONCOUNT);
+        } while (light == prev);
+
+        WriteDigit((c++) % 10);
+        MyTurn(c % 2);
+        SetLED(prev, false);
+        SetLED(light, true);
       }
     }
-    return toggledButton;
+    // Make sure all other buttons are released as well.
+    while (buttons.AnyButtonIsDown()) {
+      delay(5);
+    }
+
+    MyTurn();
+    if (light >= 0)
+      SetLED(light, false);
+    WriteDigit(0);
   }
 } io;
 
@@ -133,6 +129,7 @@ class State
 {
   byte sequenceLen = 0;
   byte inputPosition = 0;
+  byte currentButton = -1;
   int sequence[MAX_SEQ_LEN];
   unsigned long lastInputTime;
 
@@ -152,7 +149,7 @@ class State
   {
     io.Buzzer(BUTTONCOUNT);
     delay(800);
-    io.Buzzer(BUTTONCOUNT, false);
+    io.BuzzerOff();
     restart();
   }
   void restart()
@@ -170,17 +167,14 @@ class State
 
     sequence[sequenceLen++] = random(BUTTONCOUNT);
     DisplaySequence();
+    if (io.buttons.AnyButtonIsDown()) {
+      // if this happens over and over it could overflow the stack!
+      youLose();
+      return;
+    }
     inputPosition = 0;
     lastInputTime = millis();
     io.MyTurn(false);
-  }
-public:
-  void NewGame()
-  {
-    io.Demo();
-    io.WriteDigit(0);
-    sequenceLen = 0;
-    addToSequence();
   }
   void DisplaySequence()
   {
@@ -191,44 +185,77 @@ public:
         delay(BLINK_TIME);
     }
   }
-  void Process()
+public:
+  void NewGame()
   {
-    // FIXME: PollButtons could theoretically fail to report a simulataneous button press
-    int buttonNum = io.PollButtons();
-    if (buttonNum < 0) {
-      // nothing pressed: do we need to timeout?
-      unsigned long currentTime = millis();
-      if (currentTime - lastInputTime >= TIMEOUT)
-        youLose();
-    } else {
-      // a button was pressed or released
-      bool value = io.ButtonState(buttonNum);
-      if (value) {
-        // button pressed down, read the input.
-        // FIXME: if a button is pressed while one is still held down, that
-        //        should lose the game.
+    io.Demo();
+    io.WriteDigit(0);
+    sequenceLen = 0;
+    addToSequence();
+  }
+  void ProcessInput()
+  {
+    if (currentButton < 0) {
+      // Currently waiting for a button to be pressed.
+
+      if (io.buttons.PollForChange()) {
+        // make sure exactly one was pressed.
+        for (int i = 0; i < BUTTONCOUNT; i++) {
+          if (io.buttons.IsDown(i)) {
+            if (currentButton < 0)
+              currentButton = i;
+            else
+              currentButton = BUTTONCOUNT + 1; // cause failure
+          }
+        }
+
+        // verify that it's the correct button
         int correctButton = sequence[inputPosition++];
-        if (buttonNum != correctButton)
+        if (currentButton != correctButton)
           youLose();
         else {
           // display confirmation
-          io.SetLED(buttonNum);
-          io.Buzzer(buttonNum);
-          lastInputTime = millis();
-        }
-      } else {
-        // button released, move on.
-        io.SetLED(buttonNum, false);
-        io.Buzzer(buttonNum, false);
-        if (inputPosition == sequenceLen) {
-          // passed the test! make the sequence longer
-          io.WriteDigit(sequenceLen);
-          delay(NEXT_LEVEL_DELAY);
-          addToSequence();
-        } else {
+          io.SetLED(currentButton);
+          io.Buzzer(currentButton);
           lastInputTime = millis();
         }
       }
+      else {
+        // nothing pressed: do we need to timeout?
+        unsigned long currentTime = millis();
+        if (currentTime - lastInputTime >= TIMEOUT)
+          youLose();
+      }
+      return;
+    }
+
+    // Currently waiting for button to be released.
+    if (!io.buttons.PollForChange()) {
+      // check the timeout here as well, in case some joker is holding down the button
+      /* TODO
+      unsigned long currentTime = millis();
+      if (currentTime - lastInputTime >= TIMEOUT)
+        youLose();
+      */
+      return;
+    }
+
+    if (io.buttons.IsDown(currentButton)) {
+      // some other button was pressed!
+      youLose();
+      return;
+    }
+
+    // button released, move on.
+    io.SetLED(currentButton, false);
+    io.BuzzerOff();
+    if (inputPosition == sequenceLen) {
+      // passed the test! make the sequence longer
+      io.WriteDigit(sequenceLen);
+      delay(NEXT_LEVEL_DELAY);
+      addToSequence();
+    } else {
+      lastInputTime = millis();
     }
   }
 } state;
@@ -238,5 +265,5 @@ void setup() {
 }
 
 void loop() {
-  state.Process();
+  state.ProcessInput();
 }
