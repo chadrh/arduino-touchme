@@ -6,9 +6,9 @@
 // Timing constants
 constexpr int DEBOUNCE = 40;
 constexpr int TIMEOUT = 4000;
-constexpr int BLINK_TIME = 200; // when displaying sequence
-constexpr int BLINK_GAP = 200;
-constexpr int NEXT_LEVEL_DELAY = 800; // when adding to the sequence
+constexpr int BLINK_TIME = 300; // when displaying sequence
+constexpr int BLINK_GAP = 250;
+constexpr int NEXT_LEVEL_DELAY = 1000; // when adding to the sequence (~1750ms)
 
 constexpr int BUTTONCOUNT = 4;
 constexpr int MAX_SEQ_LEN = 10;
@@ -57,6 +57,7 @@ public:
   void SeedRandom()
   {
     // TODO: reads are 10 bits of resolution, so gather at least 3.
+    // NOTE: this doesn't seem to work...
     randomSeed(analogRead(A5));
   }
   void WriteDigit(int val) const
