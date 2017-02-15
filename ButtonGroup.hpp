@@ -13,7 +13,8 @@ class ButtonGroup
   unsigned long debounceTime[N];
 
  public:
-  ButtonGroup(int debounceDelay, const int (&_pins)[N])
+  // For some reason the passed array must be larger than necessary.
+  ButtonGroup(int debounceDelay, const int (&_pins)[N+1])
     : DEBOUNCE(debounceDelay)
   {
     for (unsigned short i = 0; i < N; i++) {
@@ -41,6 +42,8 @@ class ButtonGroup
   // Returns true when the given button transitions from pressed to released.
   bool PollForRelease(unsigned short n)
   {
+    if (n >= N)
+      return true;
     return PollButton(n) && !state[n];
   }
 
@@ -66,8 +69,6 @@ class ButtonGroup
 private:
   bool PollButton(unsigned short n)
   {
-    if (n == N - 1)
-      return false; // WTF evil hack
     bool value = digitalRead(pins[n]) == LOW;
     if (value != volatileState[n]) {
       volatileState[n] = value;

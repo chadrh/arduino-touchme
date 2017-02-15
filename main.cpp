@@ -21,7 +21,7 @@ constexpr int MY_TURN = A3;
 constexpr int YOUR_TURN = A4;
 constexpr int UNUSED_ANALOG = A5;
 constexpr int ledPins[BUTTONCOUNT] = { 2, 3, 4, 5 };
-constexpr int buttonPins[BUTTONCOUNT + 2] = { 6, 7, 8, 9, 11, 12 }; // 12 is actually unused
+constexpr int buttonPins[BUTTONCOUNT + 2] = { 6, 7, 8, 9, 11 }; // 12 is unused
 constexpr int STATUS_LED = 13;
 constexpr int BUZZER = 10;
 
@@ -38,7 +38,7 @@ class IO
   DigitDisplay digit;
 
 public:
-  ButtonGroup<BUTTONCOUNT + 2> buttons;
+  ButtonGroup<BUTTONCOUNT + 1> buttons;
 
   IO()
     : digit(CLOCK_PIN, LATCH_PIN, DATA_PIN)
@@ -107,6 +107,18 @@ public:
 
     // Make sure all buttons are released.
     buttons.WaitForButtons();
+
+    /*
+    Serial.begin(9600);
+    Serial.println("Hi");
+    while (true ) {
+      if (buttons.PollForChange()) {
+        for (int i = 0; i <= BUTTONCOUNT; i++) {
+          Serial.print(buttons.IsDown(i));
+        }
+        Serial.println();
+      }
+    } */
 
     while (!buttons.PollForRelease(BUTTONCOUNT)) {
       unsigned long time = millis();
