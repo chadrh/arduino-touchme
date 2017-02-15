@@ -3,10 +3,10 @@
 
 #include "Arduino.h"
 
-template <unsigned int N>
+template <unsigned short N>
 class ButtonGroup
 {
-  const int DEBOUNCE;
+  const unsigned long DEBOUNCE;
   int pins[N];
   bool state[N];
   bool volatileState[N];
@@ -16,22 +16,22 @@ class ButtonGroup
   ButtonGroup(int debounceDelay, const int (&_pins)[N])
     : DEBOUNCE(debounceDelay)
   {
-    for (unsigned int i = 0; i < N; i++) {
+    for (unsigned short i = 0; i < N; i++) {
       pins[i] = _pins[i];
       pinMode(pins[i], INPUT_PULLUP);
-      state[i] = 0;
-      volatileState[i] = 0;
+      state[i] = false;
+      volatileState[i] = false;
       debounceTime[i] = 0;
     }
   }
 
-  bool IsDown(int n) const
+  bool IsDown(unsigned short n) const
   {
     return state[n];
   }
 
   // Returns true when the given button transitions from pressed to released.
-  bool PollForRelease(int n)
+  bool PollForRelease(unsigned short n)
   {
     return PollButton(n) && !state[n];
   }
@@ -39,7 +39,7 @@ class ButtonGroup
   bool PollForChange()
   {
     bool changed = false;
-    for (int i = 0; i < N; i++) {
+    for (unsigned short i = 0; i < N; i++) {
       changed |= PollButton(i);
     }
     return changed;
@@ -47,7 +47,7 @@ class ButtonGroup
 
   bool AnyButtonIsDown()
   {
-    for (int i = 0; i < N; i++) {
+    for (unsigned short i = 0; i < N; i++) {
       PollButton(i);
       if (state[i])
         return true;
@@ -56,13 +56,14 @@ class ButtonGroup
   }
 
 private:
-  bool PollButton(int n)
+  bool PollButton(unsigned short n)
   {
+    if (n == N - 1)
+      return false; // WTF evil hack
     bool value = digitalRead(pins[n]) == LOW;
     if (value != volatileState[n]) {
       volatileState[n] = value;
       debounceTime[n] = millis();
-      return false;
     }
     else if (value != state[n] && (millis() - debounceTime[n]) > DEBOUNCE) {
       state[n] = value;

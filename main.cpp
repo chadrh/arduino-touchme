@@ -19,12 +19,17 @@ constexpr int DATA_PIN = A2;
 constexpr int MY_TURN = A3;
 constexpr int YOUR_TURN = A4;
 constexpr int UNUSED_ANALOG = A5;
-constexpr int START_BUTTON = 11; // Remove
 constexpr int ledPins[BUTTONCOUNT] = { 2, 3, 4, 5 };
-constexpr int buttonPins[BUTTONCOUNT + 1] = { 6, 7, 8, 9, 11 };
+constexpr int buttonPins[BUTTONCOUNT + 2] = { 6, 7, 8, 9, 11, 12 }; // 12 is actually unused
 constexpr int STATUS_LED = 13;
 constexpr int BUZZER = 10;
 
+
+// R: 2376?
+// Y:
+// O:
+// ?: 2148
+// G: 2865
 constexpr const int frequencies[5] = { 121, 1000, 2376, 4000, 5000 };
 
 class IO
@@ -32,7 +37,7 @@ class IO
   DigitDisplay digit;
 
 public:
-  ButtonGroup<BUTTONCOUNT + 1> buttons;
+  ButtonGroup<BUTTONCOUNT + 2> buttons;
 
   IO()
     : digit(CLOCK_PIN, LATCH_PIN, DATA_PIN)
@@ -42,7 +47,6 @@ public:
     pinMode(MY_TURN, OUTPUT);
     pinMode(YOUR_TURN, OUTPUT);
     pinMode(BUZZER, INPUT);
-    pinMode(START_BUTTON, INPUT_PULLUP);
     for (int i = 0; i < BUTTONCOUNT; i++) {
       pinMode(ledPins[i], OUTPUT);
     }
@@ -99,6 +103,10 @@ public:
     int light = -1;
     int c = 0;
 
+    // Make sure all buttons are released.
+    while (buttons.AnyButtonIsDown()) { delay(42); }
+    do { delay(42); } while (buttons.AnyButtonIsDown());
+
     while (!buttons.PollForRelease(BUTTONCOUNT)) {
       unsigned long time = millis();
       if (time - lastTime > 1000) {
@@ -106,6 +114,7 @@ public:
         do {
           light = random(BUTTONCOUNT);
         } while (light == prev);
+        lastTime = time;
 
         WriteDigit((c++) % 10);
         MyTurn(c % 2);
@@ -114,9 +123,8 @@ public:
       }
     }
     // Make sure all other buttons are released as well.
-    while (buttons.AnyButtonIsDown()) {
-      delay(5);
-    }
+    while (buttons.AnyButtonIsDown()) { delay(42); }
+    do { delay(42); } while (buttons.AnyButtonIsDown());
 
     MyTurn();
     if (light >= 0)
@@ -129,19 +137,23 @@ class State
 {
   byte sequenceLen = 0;
   byte inputPosition = 0;
-  byte currentButton = -1;
+  int currentButton = -1;
   int sequence[MAX_SEQ_LEN];
   unsigned long lastInputTime;
 
   void youWin()
   {
-    for (int i = 0; i < 3; i++) {
-      for (int i = 0; i < BUTTONCOUNT; i++)
+    // chase 5 times
+    for (int i = 0; i < 5; i++) {
+      // 0.5s for 1 ltr chase
+      for (int i = 0; i < BUTTONCOUNT; i++) {
+        if (i > 0)
+          io.SetLED(i-1, false);
         io.SetLED(i);
-      delay(800);
-      for (int i = 0; i < BUTTONCOUNT; i++)
-        io.SetLED(i, false);
-      delay(200);
+        delay(100);
+      }
+      io.SetLED(BUTTONCOUNT-1, false);
+      delay(100);
     }
     restart();
   }
@@ -167,11 +179,8 @@ class State
 
     sequence[sequenceLen++] = random(BUTTONCOUNT);
     DisplaySequence();
-    if (io.buttons.AnyButtonIsDown()) {
-      // if this happens over and over it could overflow the stack!
-      youLose();
-      return;
-    }
+
+    currentButton = -1;
     inputPosition = 0;
     lastInputTime = millis();
     io.MyTurn(false);
@@ -189,6 +198,7 @@ public:
   void NewGame()
   {
     io.Demo();
+    delay(1000);
     io.WriteDigit(0);
     sequenceLen = 0;
     addToSequence();
@@ -209,6 +219,10 @@ public:
           }
         }
 
+        // False alarm; start button.
+        if (currentButton == -1)
+          return;
+
         // verify that it's the correct button
         int correctButton = sequence[inputPosition++];
         if (currentButton != correctButton)
@@ -219,8 +233,7 @@ public:
           io.Buzzer(currentButton);
           lastInputTime = millis();
         }
-      }
-      else {
+      } else {
         // nothing pressed: do we need to timeout?
         unsigned long currentTime = millis();
         if (currentTime - lastInputTime >= TIMEOUT)
@@ -232,19 +245,27 @@ public:
     // Currently waiting for button to be released.
     if (!io.buttons.PollForChange()) {
       // check the timeout here as well, in case some joker is holding down the button
-      /* TODO
       unsigned long currentTime = millis();
-      if (currentTime - lastInputTime >= TIMEOUT)
+      if (currentTime - lastInputTime >= TIMEOUT) {
+        io.SetLED(currentButton, false);
+        io.BuzzerOff();
         youLose();
-      */
+      }
       return;
     }
 
-    if (io.buttons.IsDown(currentButton)) {
-      // some other button was pressed!
-      youLose();
-      return;
+    for (int i = 0; i < BUTTONCOUNT; i++) {
+      bool down = io.buttons.IsDown(i);
+      if (down && (i != currentButton)) {
+        // some other button was pressed!
+        io.SetLED(currentButton, false);
+        io.BuzzerOff();
+        youLose();
+        return;
+      }
     }
+    if (io.buttons.IsDown(currentButton))
+      return;
 
     // button released, move on.
     io.SetLED(currentButton, false);
@@ -257,6 +278,7 @@ public:
     } else {
       lastInputTime = millis();
     }
+    currentButton = -1;
   }
 } state;
 
