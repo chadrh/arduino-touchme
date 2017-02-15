@@ -25,6 +25,14 @@ class ButtonGroup
     }
   }
 
+  void WaitForButtons()
+  {
+    PollForChange();
+    do {
+      delay(DEBOUNCE + 1);
+    } while (AnyButtonIsDown());
+  }
+
   bool IsDown(unsigned short n) const
   {
     return state[n];

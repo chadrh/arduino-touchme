@@ -7,6 +7,7 @@
 constexpr int DEBOUNCE = 40;
 constexpr int TIMEOUT = 4000;
 constexpr int BLINK_TIME = 200; // when displaying sequence
+constexpr int BLINK_GAP = 200;
 constexpr int NEXT_LEVEL_DELAY = 800; // when adding to the sequence
 
 constexpr int BUTTONCOUNT = 4;
@@ -104,8 +105,7 @@ public:
     int c = 0;
 
     // Make sure all buttons are released.
-    while (buttons.AnyButtonIsDown()) { delay(42); }
-    do { delay(42); } while (buttons.AnyButtonIsDown());
+    buttons.WaitForButtons();
 
     while (!buttons.PollForRelease(BUTTONCOUNT)) {
       unsigned long time = millis();
@@ -123,8 +123,7 @@ public:
       }
     }
     // Make sure all other buttons are released as well.
-    while (buttons.AnyButtonIsDown()) { delay(42); }
-    do { delay(42); } while (buttons.AnyButtonIsDown());
+    buttons.WaitForButtons();
 
     MyTurn();
     if (light >= 0)
@@ -191,7 +190,7 @@ class State
       int num = sequence[i];
       io.Blink(num, BLINK_TIME);
       if (i < sequenceLen - 1)
-        delay(BLINK_TIME);
+        delay(BLINK_GAP);
     }
   }
 public:
